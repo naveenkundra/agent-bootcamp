@@ -99,8 +99,8 @@ class AsyncWeaviateKnowledgeBase:
             collection = self.async_client.collections.get(self.collection_name)
             vector = self._vectorize(keyword)
             response = await rate_limited(
-                lambda: collection.query.hybrid(
-                    keyword, vector=vector, limit=self.num_results
+                lambda: collection.query.near_vector(
+                    near_vector=vector, limit=self.num_results
                 ),
                 semaphore=self.semaphore,
             )

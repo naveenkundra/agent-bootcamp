@@ -35,7 +35,7 @@ async def weaviate_kb(configs):
     )
 
     yield AsyncWeaviateKnowledgeBase(
-        async_client=async_client, collection_name="enwiki_20250520"
+        async_client=async_client, collection_name="recipes"
     )
 
     await async_client.close()
