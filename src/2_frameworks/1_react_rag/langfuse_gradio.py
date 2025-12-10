@@ -46,7 +46,7 @@ async_weaviate_client = get_weaviate_async_client(
 async_openai_client = AsyncOpenAI()
 async_knowledgebase = AsyncWeaviateKnowledgeBase(
     async_weaviate_client,
-    collection_name="enwiki_20250520",
+    collection_name="recipes",
 )
 
 
@@ -67,7 +67,7 @@ async def _main(question: str, gr_messages: list[ChatMessage]):
     setup_langfuse_tracer()
 
     main_agent = agents.Agent(
-        name="Wikipedia Agent",
+        name="Recipe Agent with Langfuse Integration",
         instructions=REACT_INSTRUCTIONS,
         tools=[agents.function_tool(async_knowledgebase.search_knowledgebase)],
         model=agents.OpenAIChatCompletionsModel(
@@ -97,8 +97,8 @@ demo = gr.ChatInterface(
     title="2.1 OAI Agent SDK ReAct + LangFuse",
     type="messages",
     examples=[
-        "At which university did the SVP Software Engineering"
-        " at Apple (as of June 2025) earn their engineering degree?",
+            "Show me a recipe made up of apples ",
+            " Show me a recipe which takes less than 15 minutes",
     ],
 )
 
