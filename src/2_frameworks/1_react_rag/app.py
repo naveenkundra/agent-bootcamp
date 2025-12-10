@@ -49,7 +49,7 @@ async_openai_client = AsyncOpenAI()
 # Switch out collection name when ready
 async_knowledgebase = AsyncWeaviateKnowledgeBase(
     async_weaviate_client,
-    collection_name="enwiki_20250520",
+    collection_name="recipes",
 )
 
 
@@ -70,7 +70,7 @@ def _handle_sigint(signum: int, frame: object) -> None:
 async def _main(question: str, gr_messages: list[ChatMessage]):
     # Build agent with tool access to knowledge base
     main_agent = agents.Agent(
-        name="Wikipedia Agent",  # Documentation
+        name="Recipe Agent",  # Documentation
         instructions=REACT_INSTRUCTIONS,  # system prompt
         tools=[
             agents.function_tool(async_knowledgebase.search_knowledgebase)
@@ -97,8 +97,8 @@ demo = gr.ChatInterface(
     title="2.1 OAI Agent SDK ReAct",  # See title on page
     type="messages",
     examples=[  # Pre-filled suggestions in the interface
-        "At which university did the SVP Software Engineering"
-        " at Apple (as of June 2025) earn their engineering degree?",
+        "Show me a recipe made up of apples ",
+        " Show me a reipe which takes less than 15 minutes",
     ],
 )
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     )
     async_knowledgebase = AsyncWeaviateKnowledgeBase(
         async_weaviate_client,
-        collection_name="enwiki_20250520",
+        collection_name="recipes",
     )
 
     async_openai_client = AsyncOpenAI()

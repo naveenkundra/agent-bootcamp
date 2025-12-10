@@ -71,7 +71,7 @@ def _handle_sigint(signum: int, frame: object) -> None:
 
 # Worker Agent: handles long context efficiently
 kb_agent = agents.Agent(
-    name="KnowledgeBaseAgent",
+    name="Naveen_KnowledgeBaseAgent",
     instructions="""
         You are an agent specialized in searching a knowledge base.
         You will receive a single search query as input.
@@ -102,10 +102,14 @@ main_agent = agents.Agent(
 
         You have access to the following tools:
         1. 'search_knowledgebase' - use this tool to search for information in a
-            knowledge base. The knowledge base reflects recipe dataset from a select set of recipes.
+            knowledge base. The knowledge base reflects recipe dataset from a select set of recipes. The recipe 
+            containts information like recipe_name,	prep_time,	cook_time,	total_time,	servings,	yield,	
+            ingredients	directions,	rating,	url,	cuisine_path,	nutrition,
+            timing
 
         2. 'get_web_search_grounded_response' - use this tool for current events,
-            news, and checking which celebrities prefer eating some of the recipies which were searched.
+            news, and checking which celebrities prefer eating some of the recipies which were searched. 
+            Don't look for Exact Match of the recipe , a close overall description is fine 
 
         Both tools will not return raw search results or the sources themselves.
         Instead, they will return a concise summary of the key findings, along
@@ -118,23 +122,13 @@ main_agent = agents.Agent(
         into multiple search queries and execute them. It will also return the
         queries it executed. Do not repeat them.
 
-        **Routing Guidelines:**
-        - When answering a question, you should first try to use the 'search_knowledgebase'
-          tool, unless the question requires recent information after May 2025 or
-          has explicit recency cues.
-        - If either tool returns insufficient information for a given query, try
-          reformulating or using the other tool. You can call either tool multiple
-          times to get the information you need to answer the user's question.
-
         **Guidelines for synthesis**
         - After collecting results, write the final answer from your own synthesis.
-        - Add a "Sources" section listing unique sources, formatted as:
-            [1] Recipe - Details
-            [2] Celbrities loving those recipies
-          Order by first mention in your text. Every factual sentence in your final
-          response must map to at least one source.
-        - If web and knowledge base disagree, surface the disagreement and prefer sources
-          with newer publication dates.
+        - The response should be formatted as  as:
+            [1] Recipe Name and Summary
+            [2] Celbrities loving those recipies. A Clickable URL from where celebrities response was collected.
+            [2] Sugar contect in recipe
+            [3] Ingredients
         - Do not invent URLs or sources.
         - If both tools fail, say so and suggest 2–3 refined queries.
 
@@ -145,11 +139,11 @@ main_agent = agents.Agent(
     # The long context provided to the worker agent is hidden from the main agent.
     tools=[
         kb_agent.as_tool(
-            tool_name="search_knowledgebase",
+            tool_name="search_recipe",
             tool_description=(
                 "Search the knowledge base for a query and return a concise summary "
                 "of the key findings, along with the sources used to generate "
-                "the summary"
+                "the summary. Response with two recipes always"
             ),
         ),
         agents.function_tool(gemini_grounding_tool.get_web_search_grounded_response),
@@ -165,7 +159,7 @@ async def _main(question: str, gr_messages: list[ChatMessage]):
     setup_langfuse_tracer()
 
     # Use the main agent as the entry point- not the worker agent.
-    with langfuse_client.start_as_current_span(name="Agents-SDK-Trace") as span:
+    with langfuse_client.start_as_current_span(name="Naveen_Search_Agent_Trace") as span:
         span.update(input=question)
 
         result_stream = agents.Runner.run_streamed(main_agent, input=question)
