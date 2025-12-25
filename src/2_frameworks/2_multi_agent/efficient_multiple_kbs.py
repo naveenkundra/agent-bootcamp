@@ -30,36 +30,34 @@ load_dotenv(verbose=True)
 
 set_up_logging()
 
+# Load configuration and initialize async clients before constructing agents.
+configs = Configs()
+async_openai_client = AsyncOpenAI()
+async_weaviate_client = get_weaviate_async_client()
+
+# Knowledge base wrapper for efficient long-context searches.
+async_knowledgebase = AsyncWeaviateKnowledgeBase(
+    async_weaviate_client, index_name=getattr(configs, "weaviate_index_name", None)
+)
+
 AGENT_LLM_NAMES = {
-    "worker": "gemini-2.5-flash",  # less expensive,
-    "planner": "gemini-2.5-pro",  # more expensive, better at reasoning and planning
+    "worker": configs.default_worker_model,  # less expensive,
+    "planner": configs.default_planner_model,  # more expensive, better at reasoning and planning
 }
 
-configs = Configs.from_env_var()
-async_weaviate_client = get_weaviate_async_client(
-    http_host=configs.weaviate_http_host,
-    http_port=configs.weaviate_http_port,
-    http_secure=configs.weaviate_http_secure,
-    grpc_host=configs.weaviate_grpc_host,
-    grpc_port=configs.weaviate_grpc_port,
-    grpc_secure=configs.weaviate_grpc_secure,
-    api_key=configs.weaviate_api_key,
-)
-async_openai_client = AsyncOpenAI()
-async_knowledgebase = AsyncWeaviateKnowledgeBase(
-    async_weaviate_client,
-    collection_name="recipes",
-)
-
+# Grounding tool (web search) used by the planner when KB results are insufficient.
 gemini_grounding_tool = GeminiGroundingWithGoogleSearch(
-    model_settings=ModelSettings(model=AGENT_LLM_NAMES["worker"])
+    model_settings=ModelSettings(model=AGENT_LLM_NAMES["worker"]),
+    openai_client=async_openai_client,
 )
 
 
 async def _cleanup_clients() -> None:
     """Close async clients."""
-    await async_weaviate_client.close()
-    await async_openai_client.close()
+    with contextlib.suppress(Exception):
+        await async_weaviate_client.close()
+    with contextlib.suppress(Exception):
+        await async_openai_client.close()
 
 
 def _handle_sigint(signum: int, frame: object) -> None:
@@ -77,9 +75,10 @@ kb_agent = agents.Agent(
         You will receive a single search query as input.
         Use the 'search_knowledgebase' tool to perform a search, then return a
         JSON object with:
-        - 'Summary': Name of the Recipe found with the description provided
-        - 'Sugar' : Amount of Sugar in Each Recipe
-        - 'Ingredients' : All Ingredients in the Recipe
+        - 'summary': a concise synthesis of the retrieved information in your own words
+        - 'sources': a list of citations with {type: "kb", title: "...", section: "..."}
+        - 'no_results': true/false
+
         If the tool returns no matches, set "no_results": true and keep "sources" empty.
         Do NOT make up information. Do NOT return raw search results or long quotes.
     """,
@@ -102,10 +101,11 @@ main_agent = agents.Agent(
 
         You have access to the following tools:
         1. 'search_knowledgebase' - use this tool to search for information in a
-            knowledge base. The knowledge base reflects recipe dataset from a select set of recipes.
-
+            knowledge base. The knowledge base reflects a subset of Wikipedia as
+            of May 2025.
         2. 'get_web_search_grounded_response' - use this tool for current events,
-            news, and checking which celebrities prefer eating some of the recipies which were searched.
+            news, fact-checking or when the information in the knowledge base is
+            not sufficient to answer the question.
 
         Both tools will not return raw search results or the sources themselves.
         Instead, they will return a concise summary of the key findings, along
@@ -129,8 +129,8 @@ main_agent = agents.Agent(
         **Guidelines for synthesis**
         - After collecting results, write the final answer from your own synthesis.
         - Add a "Sources" section listing unique sources, formatted as:
-            [1] Recipe - Details
-            [2] Celbrities loving those recipies
+            [1] Publisher - URL
+            [2] Wikipedia: <Page Title> (Section: <section>)
           Order by first mention in your text. Every factual sentence in your final
           response must map to at least one source.
         - If web and knowledge base disagree, surface the disagreement and prefer sources
@@ -182,14 +182,14 @@ demo = gr.ChatInterface(
     title="2.3 Multi-Agent with Multiple Search Tools",
     type="messages",
     examples=[
-            "Show me a recipe made up of apples ",
-            " Show me a recipe which takes less than 15 minutes",
+        "At which university did the SVP Software Engineering"
+        " at Apple (as of June 2025) earn their engineering degree?",
+        "How does the annual growth in the 50th-percentile income "
+        "in the US compare with that in Canada?",
     ],
 )
 
 if __name__ == "__main__":
-    async_openai_client = AsyncOpenAI()
-
     signal.signal(signal.SIGINT, _handle_sigint)
 
     try:
